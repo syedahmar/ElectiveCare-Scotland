@@ -1,0 +1,231 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+Preprocess the raw data to easily import into Matlab for further processing. The final files will be CSV and will be across all specialties, and across Scotland.
+
+The following will process data using the default categorisation (i.e. elective type either inpatient/day case or outpatients)
+```{r}
+rm(list=ls())
+library(dplyr)
+library(lubridate)
+waiting <- read.csv('data/OngoingWaits_May2024.csv')
+capacity <-read.csv('data/CompletedWaits_May2024.csv')
+additions <-read.csv('data/AdditionsRemovals_May2024.csv')
+
+waiting_selected <-waiting%>%
+  mutate(date=ymd(MonthEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  arrange(date)
+
+capacity_selected <-capacity%>%
+  mutate(date=ymd(QuarterEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  arrange(date)
+
+additions_selected <-additions%>%
+  mutate(date=ymd(QuarterEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  arrange(date)
+
+
+write.csv(capacity_selected,file='capacity_electiveType.csv')
+write.csv(waiting_selected,file='waiting_electiveType.csv')
+write.csv(additions_selected,file='additions_electiveType.csv')
+
+```
+
+Now process the distribution data (again while keeping the inpatient/day case and outpatient separate)
+```{r}
+rm(list=ls())
+library(dplyr)
+library(lubridate)
+waiting_distribution <-read.csv('data/Distribution_OngoingWaits_May2024.csv')
+
+
+# distribution for across all specialties, and across Scotland
+waiting_distribution_electiveType <-waiting_distribution%>%
+  mutate(date=ymd(MonthEnd))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  arrange(date)
+
+write.csv(waiting_distribution_electiveType,file='waiting_distribution_elective.csv')
+
+
+
+#### Let us get filtered data for stratified analyses for waiting
+
+# By Region
+waiting_distribution_selected_region <-waiting_distribution%>%
+  mutate(date=ymd(MonthEnd))%>%
+  filter(Specialty=='Z9')%>%
+  arrange(date)
+
+# By Specialty
+waiting_distribution_selected_specialty <-waiting_distribution%>%
+  mutate(date=ymd(MonthEnd))%>%
+  filter(HBT=="S92000003")%>%
+  arrange(date)
+
+write.csv(waiting_distribution_selected_region,file='waiting_distribution_selected_region.csv')
+write.csv(waiting_distribution_selected_specialty,file='waiting_distribution_selected_specialty.csv')
+
+
+## now process and save the capacity distribution file
+capacity_distribution <-read.csv('data/Distribution_CompletedWaits_May2024.csv')
+
+
+# distribution for across all specialties, and across Scotland
+capacity_distribution_electiveType <-capacity_distribution%>%
+  mutate(date=ymd(QuarterEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  arrange(date)
+
+write.csv(capacity_distribution_electiveType,file='capacity_distribution_electiveType.csv')
+
+
+
+```
+
+Now, import the overall ongoing waiting, and the additions/removals when combining the elective types to get an overall picture
+```{r}
+rm(list=ls())
+library(dplyr)
+library(lubridate)
+waiting <- read.csv('data/OngoingWaits_May2024.csv')
+capacity <-read.csv('data/CompletedWaits_May2024.csv')
+additions <-read.csv('data/AdditionsRemovals_May2024.csv')
+
+waiting_overall <-waiting%>%
+  mutate(date=ymd(MonthEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  group_by(date)%>%
+  mutate(NumberWaiting=sum(NumberWaiting))%>%
+  mutate(NumberWaitingOver12Weeks=sum(NumberWaitingOver12Weeks))%>%
+  filter(row_number()==1)%>%
+  select(-PatientType)%>%
+  arrange(date)
+
+capacity_overall <-capacity%>%
+  mutate(date=ymd(QuarterEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  group_by(date)%>%
+  mutate(NumberSeen=sum(NumberSeen))%>%
+  mutate(WaitedOver12Weeks=sum(WaitedOver12Weeks))%>%
+  filter(row_number()==1)%>%
+  select(-PatientType)%>%
+  arrange(date)
+
+additions_overall <-additions%>%
+  mutate(date=ymd(QuarterEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  group_by(date)%>%
+  mutate(Additions=sum(Additions))%>%
+  mutate(Removals=sum(Removals))%>%
+  filter(row_number()==1)%>%
+  select(-PatientType)%>%
+  arrange(date)
+
+
+write.csv(waiting_overall,file='waiting_overall.csv')
+write.csv(capacity_overall,file='capacity_overall.csv')
+write.csv(additions_overall,file='additions_overall.csv')
+
+```
+
+Now process the distribution data but combine the elective types to get an overall picture
+```{r}
+rm(list=ls())
+library(dplyr)
+library(lubridate)
+
+################# Waiting 
+
+waiting_distribution <-read.csv('data/Distribution_OngoingWaits_May2024.csv')
+
+
+# distribution for across all specialties, and across Scotland
+waiting_distribution_overall <-waiting_distribution%>%
+  mutate(date=ymd(MonthEnd))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  group_by(date)%>%
+  mutate(LessThan4WeekWait=sum(LessThan4WeekWait))%>%
+  mutate(X4To8WeekWait=sum(X4To8WeekWait))%>%
+  mutate(X8To12WeekWait=sum(X8To12WeekWait))%>%
+  mutate(X12To16WeekWait=sum(X12To16WeekWait))%>%
+  mutate(X16To20WeekWait=sum(X16To20WeekWait))%>%
+  mutate(X20To24WeekWait=sum(X20To24WeekWait))%>%
+  mutate(X24To28WeekWait=sum(X24To28WeekWait))%>%
+  mutate(X28To32WeekWait=sum(X28To32WeekWait))%>%
+  mutate(X32To36WeekWait=sum(X32To36WeekWait))%>%
+  mutate(X36To40WeekWait=sum(X36To40WeekWait))%>%
+  mutate(X40To44WeekWait=sum(X40To44WeekWait))%>%
+  mutate(X44To48WeekWait=sum(X44To48WeekWait))%>%
+  mutate(X48To52WeekWait=sum(X48To52WeekWait))%>%
+  mutate(X52To65WeekWait=sum(X52To65WeekWait))%>%
+  mutate(X65To78WeekWait=sum(X65To78WeekWait))%>%
+  mutate(X78To91WeekWait=sum(X78To91WeekWait))%>%
+  mutate(X91To104WeekWait=sum(X91To104WeekWait))%>%
+  mutate(X104To117WeekWait=sum(X104To117WeekWait))%>%
+  mutate(X117To130WeekWait=sum(X117To130WeekWait))%>%
+  mutate(X130To143WeekWait=sum(X130To143WeekWait))%>%
+  mutate(X143To156WeekWait=sum(X143To156WeekWait))%>%
+  mutate(Over156WeekWait=sum(Over156WeekWait))%>%
+  filter(row_number()==1)%>%
+  select(-PatientType)%>%
+  arrange(date)
+
+write.csv(waiting_distribution_overall,file='waiting_distribution_overall.csv')
+
+
+################# Capacity
+
+capacity_distribution <-read.csv('data/Distribution_CompletedWaits_May2024.csv')
+
+
+# distribution for across all specialties, and across Scotland
+capacity_distribution_overall <-capacity_distribution%>%
+  mutate(date=ymd(QuarterEnding))%>%
+  filter(HBT=="S92000003")%>%
+  filter(Specialty=='Z9')%>%
+  group_by(date)%>%
+  mutate(LessThan4WeekWait=sum(LessThan4WeekWait))%>%
+  mutate(X4To8WeekWait=sum(X4To8WeekWait))%>%
+  mutate(X8To12WeekWait=sum(X8To12WeekWait))%>%
+  mutate(X12To16WeekWait=sum(X12To16WeekWait))%>%
+  mutate(X16To20WeekWait=sum(X16To20WeekWait))%>%
+  mutate(X20To24WeekWait=sum(X20To24WeekWait))%>%
+  mutate(X24To28WeekWait=sum(X24To28WeekWait))%>%
+  mutate(X28To32WeekWait=sum(X28To32WeekWait))%>%
+  mutate(X32To36WeekWait=sum(X32To36WeekWait))%>%
+  mutate(X36To40WeekWait=sum(X36To40WeekWait))%>%
+  mutate(X40To44WeekWait=sum(X40To44WeekWait))%>%
+  mutate(X44To48WeekWait=sum(X44To48WeekWait))%>%
+  mutate(X48To52WeekWait=sum(X48To52WeekWait))%>%
+  mutate(X52To65WeekWait=sum(X52To65WeekWait))%>%
+  mutate(X65To78WeekWait=sum(X65To78WeekWait))%>%
+  mutate(X78To91WeekWait=sum(X78To91WeekWait))%>%
+  mutate(X91To104WeekWait=sum(X91To104WeekWait))%>%
+  mutate(X104To117WeekWait=sum(X104To117WeekWait))%>%
+  mutate(X117To130WeekWait=sum(X117To130WeekWait))%>%
+  mutate(X130To143WeekWait=sum(X130To143WeekWait))%>%
+  mutate(X143To156WeekWait=sum(X143To156WeekWait))%>%
+  mutate(Over156WeekWait=sum(Over156WeekWait))%>%
+  filter(row_number()==1)%>%
+  select(-PatientType)%>%
+  arrange(date)
+
+write.csv(capacity_distribution_overall,file='capacity_distribution_overall.csv')
+
+```
